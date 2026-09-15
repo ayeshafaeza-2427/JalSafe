@@ -5,6 +5,16 @@ import { StatusBadge } from '../components/StatusBadge';
 import { demoDeviceStatus, demoInletReading, demoOutletReading } from '../lib/demo-data';
 import { runTreatmentController } from '../lib/treatment-controller';
 
+const lifecycleLabels = [
+  'Source Check',
+  'Filtration',
+  'UF',
+  'UV',
+  'Outlet Verification',
+  'Safety Decision',
+  'Release / Reject',
+];
+
 export function TreatmentPage() {
   const [safeSimulation, setSafeSimulation] = useState(false);
   const outlet = useMemo(
@@ -19,10 +29,14 @@ export function TreatmentPage() {
     connectivity: demoDeviceStatus.health.sensorConnectivity,
     uvFlowInterlockOk: true,
     recordWritable: true,
-    thresholds: undefined,
   }), [outlet]);
 
-  const failed = !result.releaseAllowed;
+  const rejected = !result.releaseAllowed;
+  const stageCompleted = lifecycleLabels.map((_, index) => {
+    if (index < 4) return result.decision.passed || result.decision.failedParameter?.startsWith('outlet.') === true;
+    if (index === 4) return result.decision.passed || result.decision.failedParameter?.startsWith('outlet.') === true;
+    return true;
+  });
 
   return (
     <Layout>
@@ -46,28 +60,34 @@ export function TreatmentPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cycle CYC-1028</p><h2 className="mt-2 text-xl font-bold">Source → Treatment → Verification → Decision</h2></div>
-            <StatusBadge tone={failed ? 'danger' : 'safe'} label={failed ? 'REJECTED / LOCKED' : 'VERIFIED / RELEASED'} />
+            <StatusBadge tone={rejected ? 'danger' : 'safe'} label={rejected ? 'REJECTED / LOCKED' : 'VERIFIED / RELEASED'} />
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-7">
-            {result.stages.slice(0, 7).map((stage, index) => (
-              <div key={`${stage.name}-${index}`} className="relative">
-                <div className={`flex h-11 w-11 items-center justify-center rounded-full border-4 border-white shadow-sm ${stage.complete ? (stage.name === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700') : 'bg-slate-100 text-slate-400'}`}>
-                  {stage.complete ? (stage.name === 'REJECTED' ? <CircleAlert size={18} /> : <CheckCircle2 size={18} />) : <span className="text-xs font-bold">{index + 1}</span>}
+            {lifecycleLabels.map((label, index) => {
+              const complete = stageCompleted[index];
+              const failedStage = rejected && (index === 4 || index === 5 || index === 6);
+              return (
+                <div key={label} className="relative">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-full border-4 border-white shadow-sm ${failedStage ? 'bg-red-100 text-red-700' : complete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                    {failedStage ? <CircleAlert size={18} /> : complete ? <CheckCircle2 size={18} /> : <span className="text-xs font-bold">{index + 1}</span>}
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-slate-800">{label}</h3>
+                  <p className={`mt-2 text-xs font-semibold ${failedStage ? 'text-red-700' : complete ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    {failedStage ? 'BLOCKED' : complete ? 'COMPLETED' : 'WAITING'}
+                  </p>
+                  {index < lifecycleLabels.length - 1 ? <div className="absolute left-11 top-5 hidden h-px w-[calc(100%-2rem)] bg-slate-200 md:block" /> : null}
                 </div>
-                <h3 className="mt-3 text-sm font-bold text-slate-800">{stage.name.replace('_', ' ')}</h3>
-                <p className={`mt-2 text-xs font-semibold ${stage.complete ? (stage.name === 'REJECTED' ? 'text-red-700' : 'text-emerald-700') : 'text-slate-400'}`}>{stage.complete ? 'COMPLETED' : 'WAITING'}</p>
-                {index < 6 ? <div className="absolute left-11 top-5 hidden h-px w-[calc(100%-2rem)] bg-slate-200 md:block" /> : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
-        <section className={`rounded-2xl border p-6 ${failed ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}>
-          <div className={`flex items-center gap-3 ${failed ? 'text-red-800' : 'text-emerald-800'}`}>
-            {failed ? <LockKeyhole size={25} /> : <CheckCircle2 size={25} />}
+        <section className={`rounded-2xl border p-6 ${rejected ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}>
+          <div className={`flex items-center gap-3 ${rejected ? 'text-red-800' : 'text-emerald-800'}`}>
+            {rejected ? <LockKeyhole size={25} /> : <CheckCircle2 size={25} />}
             <h2 className="text-2xl font-bold">{result.solenoid === 'LOCKED' ? 'OUTPUT LOCKED' : 'OUTPUT RELEASED'}</h2>
           </div>
-          <p className={`mt-3 font-medium ${failed ? 'text-red-900' : 'text-emerald-900'}`}>
+          <p className={`mt-3 font-medium ${rejected ? 'text-red-900' : 'text-emerald-900'}`}>
             {result.decision.rejectionReason ?? 'Outlet verification passed for the configured parameters.'}
           </p>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
