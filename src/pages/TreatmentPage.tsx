@@ -32,11 +32,17 @@ export function TreatmentPage() {
   }), [outlet]);
 
   const rejected = !result.releaseAllowed;
-  const stageCompleted = lifecycleLabels.map((_, index) => {
-    if (index < 4) return result.decision.passed || result.decision.failedParameter?.startsWith('outlet.') === true;
-    if (index === 4) return result.decision.passed || result.decision.failedParameter?.startsWith('outlet.') === true;
-    return true;
-  });
+  const outletFailure = result.decision.failedParameter?.startsWith('outlet.') === true;
+  const preTreatmentFailure = rejected && !outletFailure;
+  const stageCompleted = [
+    true,
+    !preTreatmentFailure,
+    !preTreatmentFailure,
+    !preTreatmentFailure,
+    result.decision.passed || outletFailure,
+    rejected || result.decision.passed,
+    rejected || result.decision.passed,
+  ];
 
   return (
     <Layout>
@@ -65,7 +71,7 @@ export function TreatmentPage() {
           <div className="mt-8 grid gap-4 md:grid-cols-7">
             {lifecycleLabels.map((label, index) => {
               const complete = stageCompleted[index];
-              const failedStage = rejected && (index === 4 || index === 5 || index === 6);
+              const failedStage = rejected && ((outletFailure && index >= 4) || (preTreatmentFailure && index === 1));
               return (
                 <div key={label} className="relative">
                   <div className={`flex h-11 w-11 items-center justify-center rounded-full border-4 border-white shadow-sm ${failedStage ? 'bg-red-100 text-red-700' : complete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
