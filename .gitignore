@@ -1,0 +1,9 @@
+node_modules
+dist
+*.local
+.env
+.env.local
+*.log
+.DS_Store
+PRD_extracted.txt
+supabase/.temp/
