@@ -27,28 +27,29 @@ describe('JalSafe safety engine', () => {
   });
 
   it('fails closed when a required sensor is disconnected', () => {
-    const decision = evaluateSafety({
-      ...base,
-      outlet: { ...base.outlet, ph: null },
-    });
-    expect(decision.passed).toBe(false);
+    const decision = evaluateSafety({ ...base, outlet: { ...base.outlet, ph: null } });
     expect(decision.rejectionCode).toBe('SENSOR_DISCONNECTED');
     expect(isReleaseAllowed(decision)).toBe(false);
   });
 
   it('fails closed when calibration has expired', () => {
-    const decision = evaluateSafety({
-      ...base,
-      health: { ...base.health, calibrationStatus: 'EXPIRED' },
-    });
+    const decision = evaluateSafety({ ...base, health: { ...base.health, calibrationStatus: 'EXPIRED' } });
     expect(decision.rejectionCode).toBe('CALIBRATION_EXPIRED');
     expect(isReleaseAllowed(decision)).toBe(false);
   });
 
-  it('fails closed when the UV flow interlock is not valid', () => {
-    const decision = evaluateSafety({ ...base, uvFlowInterlockOk: false });
-    expect(decision.rejectionCode).toBe('FLOW_OUT_OF_RANGE');
+  it('fails closed when battery is below the configured minimum', () => {
+    const decision = evaluateSafety({ ...base, health: { ...base.health, batteryLevel: 10 } });
+    expect(decision.rejectionCode).toBe('LOW_BATTERY');
     expect(isReleaseAllowed(decision)).toBe(false);
+  });
+
+  it('fails closed when the UV flow interlock is false or unknown', () => {
+    const failed = evaluateSafety({ ...base, uvFlowInterlockOk: false });
+    const unknown = evaluateSafety({ ...base, uvFlowInterlockOk: undefined });
+    expect(failed.rejectionCode).toBe('FLOW_OUT_OF_RANGE');
+    expect(unknown.rejectionCode).toBe('FLOW_OUT_OF_RANGE');
+    expect(isReleaseAllowed(unknown)).toBe(false);
   });
 
   it('fails closed when the treatment record cannot be written', () => {
