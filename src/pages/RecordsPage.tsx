@@ -1,5 +1,6 @@
 import { CheckCircle2, ChevronRight, FileCheck2, QrCode, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Layout } from '../components/Layout';
 import { StatusBadge } from '../components/StatusBadge';
 import { demoDeviceStatus, demoInletReading, demoOutletReading, demoTreatmentRecords, demoTreatmentStages } from '../lib/demo-data';
@@ -7,5 +8,87 @@ import { demoDeviceStatus, demoInletReading, demoOutletReading, demoTreatmentRec
 export function RecordsPage() {
   const [selectedId, setSelectedId] = useState(demoTreatmentRecords[0]?.id ?? '');
   const selected = demoTreatmentRecords.find((record) => record.id === selectedId) ?? demoTreatmentRecords[0];
-  return <Layout><div className="space-y-6"><section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Traceability</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Treatment records</h1><p className="mt-1 text-slate-600">Simulated records created by the Demo Device safety workflow.</p></div><StatusBadge tone="neutral" label="DEMO RECORDS" /></section><section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500"><tr><th className="px-5 py-4">Cycle ID</th><th className="px-5 py-4">Date / time</th><th className="px-5 py-4">Treatment</th><th className="px-5 py-4">Safety decision</th><th className="px-5 py-4">Release</th><th className="px-5 py-4" /></tr></thead><tbody>{demoTreatmentRecords.map((record) => <tr key={record.id} className={`border-b border-slate-100 last:border-0 ${record.id === selectedId ? 'bg-teal-50/60' : ''}`}><td className="px-5 py-4 font-bold text-slate-900">{record.id}</td><td className="px-5 py-4 text-slate-600">{record.timestamp}</td><td className="px-5 py-4"><StatusBadge tone={record.status === 'COMPLETE' ? 'safe' : 'warning'} label={record.status} /></td><td className="px-5 py-4"><StatusBadge tone={record.result === 'VERIFIED' ? 'safe' : 'danger'} label={record.result} /></td><td className="px-5 py-4 font-semibold text-slate-700">{record.releaseStatus}</td><td className="px-5 py-4 text-right"><button type="button" onClick={() => setSelectedId(record.id)} className="inline-flex items-center gap-1 font-semibold text-teal-700 hover:text-teal-900">Details <ChevronRight size={16} /></button></td></tr>)}</tbody></table></div></section>{selected ? <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.14em] text-slate-500">Record details</p><h2 className="mt-2 text-2xl font-bold">{selected.id}</h2></div><StatusBadge tone={selected.result === 'VERIFIED' ? 'safe' : 'danger'} label={`${selected.result} · ${selected.releaseStatus}`} /></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><div><span className="text-xs text-slate-500">Timestamp</span><p className="font-semibold">{selected.timestamp}</p></div><div><span className="text-xs text-slate-500">Device</span><p className="font-semibold">{demoDeviceStatus.name} · {demoDeviceStatus.serialNumber}</p></div><div><span className="text-xs text-slate-500">Record status</span><p className="font-semibold">{selected.recordStatus}</p></div><div><span className="text-xs text-slate-500">Record hash</span><p className="font-mono text-sm font-semibold">{selected.recordHash}</p></div></div><div className="mt-6 border-t border-slate-100 pt-5"><h3 className="font-bold">Sensor summary</h3><div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4"><span>Inlet pH <strong className="block">{demoInletReading.ph}</strong></span><span>Inlet TDS <strong className="block">{demoInletReading.tds} mg/L</strong></span><span>Outlet pH <strong className="block">{demoOutletReading.ph}</strong></span><span>Outlet turbidity <strong className="block text-red-700">{demoOutletReading.turbidity} NTU</strong></span></div></div><div className="mt-6 border-t border-slate-100 pt-5"><h3 className="font-bold">Treatment stages</h3><div className="mt-3 grid gap-2 sm:grid-cols-2">{demoTreatmentStages.map((stage) => <div key={stage.name} className="flex items-center gap-2 text-sm"><CheckCircle2 size={15} className={stage.status === 'COMPLETED' ? 'text-emerald-600' : 'text-red-600'} />{stage.name}<span className="ml-auto text-xs font-semibold text-slate-500">{stage.status}</span></div>)}</div></div><div className="mt-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-800"><ShieldAlert size={18} className="shrink-0" /><span><strong>Safety decision:</strong> {selected.reason}</span></div></div><div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-2"><QrCode size={20} className="text-teal-700" /><h2 className="text-lg font-bold">QR Verification</h2></div><p className="mt-1 text-sm text-slate-600">Verify Treatment Record</p><div className="mx-auto mt-6 grid h-48 w-48 grid-cols-9 gap-1 rounded-xl border-8 border-slate-900 bg-white p-2">{Array.from({ length: 81 }, (_, index) => <span key={index} className={(index * 17 + index % 5) % 7 < 3 ? 'bg-slate-900' : 'bg-white'} />)}</div><div className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4 text-sm"><div className="flex justify-between"><span className="text-slate-500">Cycle ID</span><strong>{selected.id}</strong></div><div className="flex justify-between"><span className="text-slate-500">Safety</span><strong className="text-red-700">{selected.result}</strong></div><div className="flex justify-between"><span className="text-slate-500">Release</span><strong>{selected.releaseStatus}</strong></div><div className="flex items-center gap-2 border-t border-slate-200 pt-3 font-semibold text-teal-800"><FileCheck2 size={16} />Prototype verification — connected to demo treatment record.</div></div></div></section> : null}</div></Layout>;
+
+  const verificationPayload = useMemo(() => {
+    if (!selected) return '';
+    return JSON.stringify({
+      app: 'JalSafe',
+      recordId: selected.id,
+      timestamp: selected.timestamp,
+      result: selected.result,
+      release: selected.releaseStatus,
+      hash: selected.recordHash,
+    });
+  }, [selected]);
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Traceability</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">Treatment records</h1>
+            <p className="mt-1 text-slate-600">Simulated records created by the JalSafe safety workflow.</p>
+          </div>
+          <StatusBadge tone="neutral" label="DEMO RECORDS" />
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
+                <tr><th className="px-5 py-4">Cycle ID</th><th className="px-5 py-4">Date / time</th><th className="px-5 py-4">Treatment</th><th className="px-5 py-4">Safety decision</th><th className="px-5 py-4">Release</th><th className="px-5 py-4" /></tr>
+              </thead>
+              <tbody>
+                {demoTreatmentRecords.map((record) => (
+                  <tr key={record.id} className={`border-b border-slate-100 last:border-0 ${record.id === selectedId ? 'bg-teal-50/60' : ''}`}>
+                    <td className="px-5 py-4 font-bold text-slate-900">{record.id}</td>
+                    <td className="px-5 py-4 text-slate-600">{record.timestamp}</td>
+                    <td className="px-5 py-4"><StatusBadge tone={record.status === 'COMPLETE' ? 'safe' : 'warning'} label={record.status} /></td>
+                    <td className="px-5 py-4"><StatusBadge tone={record.result === 'VERIFIED' ? 'safe' : 'danger'} label={record.result} /></td>
+                    <td className="px-5 py-4 font-semibold text-slate-700">{record.releaseStatus}</td>
+                    <td className="px-5 py-4 text-right"><button type="button" onClick={() => setSelectedId(record.id)} className="inline-flex items-center gap-1 font-semibold text-teal-700 hover:text-teal-900">Details <ChevronRight size={16} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {selected ? (
+          <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><p className="text-xs uppercase tracking-[0.14em] text-slate-500">Record details</p><h2 className="mt-2 text-2xl font-bold">{selected.id}</h2></div>
+                <StatusBadge tone={selected.result === 'VERIFIED' ? 'safe' : 'danger'} label={`${selected.result} · ${selected.releaseStatus}`} />
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div><span className="text-xs text-slate-500">Timestamp</span><p className="font-semibold">{selected.timestamp}</p></div>
+                <div><span className="text-xs text-slate-500">Device</span><p className="font-semibold">{demoDeviceStatus.name} · {demoDeviceStatus.serialNumber}</p></div>
+                <div><span className="text-xs text-slate-500">Record status</span><p className="font-semibold">{selected.recordStatus}</p></div>
+                <div><span className="text-xs text-slate-500">Record hash</span><p className="font-mono text-sm font-semibold">{selected.recordHash}</p></div>
+              </div>
+              <div className="mt-6 border-t border-slate-100 pt-5"><h3 className="font-bold">Sensor summary</h3><div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4"><span>Inlet pH <strong className="block">{demoInletReading.ph}</strong></span><span>Inlet TDS <strong className="block">{demoInletReading.tds} mg/L</strong></span><span>Outlet pH <strong className="block">{demoOutletReading.ph}</strong></span><span>Outlet turbidity <strong className="block text-red-700">{demoOutletReading.turbidity} NTU</strong></span></div></div>
+              <div className="mt-6 border-t border-slate-100 pt-5"><h3 className="font-bold">Treatment stages</h3><div className="mt-3 grid gap-2 sm:grid-cols-2">{demoTreatmentStages.map((stage) => <div key={stage.name} className="flex items-center gap-2 text-sm"><CheckCircle2 size={15} className={stage.status === 'COMPLETED' ? 'text-emerald-600' : 'text-red-600'} />{stage.name}<span className="ml-auto text-xs font-semibold text-slate-500">{stage.status}</span></div>)}</div></div>
+              <div className={`mt-6 flex items-start gap-2 rounded-xl p-4 text-sm ${selected.result === 'VERIFIED' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}><ShieldAlert size={18} className="shrink-0" /><span><strong>Safety decision:</strong> {selected.reason}</span></div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-2"><QrCode size={20} className="text-teal-700" /><h2 className="text-lg font-bold">QR Verification</h2></div>
+              <p className="mt-1 text-sm text-slate-600">Scan to inspect this treatment record payload.</p>
+              <div className="mx-auto mt-6 flex w-fit rounded-xl border-8 border-slate-900 bg-white p-3">
+                <QRCodeSVG value={verificationPayload} size={176} level="M" includeMargin={false} aria-label={`QR code for ${selected.id}`} />
+              </div>
+              <div className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Cycle ID</span><strong>{selected.id}</strong></div>
+                <div className="flex justify-between"><span className="text-slate-500">Safety</span><strong className={selected.result === 'VERIFIED' ? 'text-emerald-700' : 'text-red-700'}>{selected.result}</strong></div>
+                <div className="flex justify-between"><span className="text-slate-500">Release</span><strong>{selected.releaseStatus}</strong></div>
+                <div className="flex items-center gap-2 border-t border-slate-200 pt-3 font-semibold text-teal-800"><FileCheck2 size={16} />QR payload is generated from the selected demo record.</div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </Layout>
+  );
 }
