@@ -31,46 +31,36 @@ export interface TreatmentControllerResult {
   stages: Array<{ name: TreatmentControllerState; complete: boolean }>;
 }
 
-/** Runs the software treatment lifecycle. It never unlocks unless the final outlet gate is VERIFIED. */
+/** Runs the complete software treatment lifecycle. Release is only possible after final verification. */
 export function runTreatmentController(input: TreatmentControllerInput): TreatmentControllerResult {
-  const sourceDecision = evaluateSafety({
-    ...input,
-    treatmentCompleted: false,
-  });
+  const sourceDecision = evaluateSafety({ ...input, treatmentCompleted: false });
 
-  if (!sourceDecision.passed) {
-    return result('REJECTED', sourceDecision);
-  }
+  if (!sourceDecision.passed) return result('REJECTED', sourceDecision);
 
-  const verificationDecision = evaluateSafety({
-    ...input,
-    treatmentCompleted: true,
-  });
-
-  if (!verificationDecision.passed) {
-    return result('LOCKED', verificationDecision);
-  }
-
-  return result('VERIFIED', verificationDecision);
+  const verificationDecision = evaluateSafety({ ...input, treatmentCompleted: true });
+  return verificationDecision.passed
+    ? result('VERIFIED', verificationDecision)
+    : result('LOCKED', verificationDecision);
 }
 
 function result(state: TreatmentControllerState, decision: SafetyDecision): TreatmentControllerResult {
   const releaseAllowed = isReleaseAllowed(decision);
   const locked = !releaseAllowed;
+
   return {
     state,
     decision,
     solenoid: locked ? 'LOCKED' : 'UNLOCKED',
     releaseAllowed,
     stages: [
-      { name: 'SOURCE_CHECK', complete: true },
-      { name: 'FILTRATION', complete: decision.passed },
-      { name: 'UF', complete: decision.passed },
-      { name: 'UV', complete: decision.passed },
-      { name: 'VERIFYING', complete: decision.passed },
+      { name: 'SOURCE_CHECK', complete: decision.state !== 'REJECTED' || decision.failedParameter?.startsWith('inlet.') !== true },
+      { name: 'FILTRATION', complete: decision.passed || decision.failedParameter?.startsWith('outlet.') === true },
+      { name: 'UF', complete: decision.passed || decision.failedParameter?.startsWith('outlet.') === true },
+      { name: 'UV', complete: decision.passed || decision.failedParameter?.startsWith('outlet.') === true },
+      { name: 'VERIFYING', complete: decision.passed || decision.failedParameter?.startsWith('outlet.') === true },
       { name: 'VERIFIED', complete: releaseAllowed },
       { name: 'REJECTED', complete: !decision.passed },
-      { name: 'LOCKED', complete: !releaseAllowed },
+      { name: 'LOCKED', complete: locked },
     ],
   };
 }
