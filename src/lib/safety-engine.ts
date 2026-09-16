@@ -44,12 +44,8 @@ function checkReading(
   if (reading.ph < t.ph.min || reading.ph > t.ph.max) {
     return fail(point === 'inlet' ? 'INLET_PH_OUT_OF_RANGE' : 'OUTLET_PH_OUT_OF_RANGE', `${point}.ph`, reading.ph, reading.ph < t.ph.min ? t.ph.min : t.ph.max);
   }
-  if (reading.tds > t.tds.max) {
-    return fail(point === 'inlet' ? 'INLET_TDS_HIGH' : 'OUTLET_TDS_HIGH', `${point}.tds`, reading.tds, t.tds.max);
-  }
-  if (reading.turbidity > t.turbidity.max) {
-    return fail(point === 'inlet' ? 'INLET_TURBIDITY_HIGH' : 'OUTLET_TURBIDITY_HIGH', `${point}.turbidity`, reading.turbidity, t.turbidity.max);
-  }
+  if (reading.tds > t.tds.max) return fail(point === 'inlet' ? 'INLET_TDS_HIGH' : 'OUTLET_TDS_HIGH', `${point}.tds`, reading.tds, t.tds.max);
+  if (reading.turbidity > t.turbidity.max) return fail(point === 'inlet' ? 'INLET_TURBIDITY_HIGH' : 'OUTLET_TURBIDITY_HIGH', `${point}.turbidity`, reading.turbidity, t.turbidity.max);
   if (reading.temperature < t.temperature.min || reading.temperature > t.temperature.max) {
     return fail(point === 'inlet' ? 'INLET_TEMPERATURE_OUT_OF_RANGE' : 'OUTLET_TEMPERATURE_OUT_OF_RANGE', `${point}.temperature`, reading.temperature, reading.temperature < t.temperature.min ? t.temperature.min : t.temperature.max);
   }
@@ -60,7 +56,7 @@ function checkReading(
 }
 
 function checkConnectivity(connectivity: SensorConnectivity): SafetyDecision | null {
-  const missing = Object.entries(connectivity).find(([, connected]) => !connected);
+  const missing = Object.entries(connectivity).find(([, connected]) => connected !== true);
   if (missing) return createFailDecision('SENSOR_DISCONNECTED', `sensor.${missing[0]}`, 0, 1);
   return null;
 }
@@ -76,7 +72,7 @@ function checkFilters(filters: FilterHealth, minimum: number): SafetyDecision | 
   return null;
 }
 
-/** Pure, deterministic safety gate. Any unknown/failed critical condition rejects release. */
+/** Pure, deterministic safety gate. Unknown or failed critical conditions always prevent release. */
 export function evaluateSafety(input: SafetyEngineInput): SafetyDecision {
   const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS;
   const connectivity = input.connectivity ?? input.health.sensorConnectivity;
@@ -84,9 +80,7 @@ export function evaluateSafety(input: SafetyEngineInput): SafetyDecision {
   const connectivityFailure = checkConnectivity(connectivity);
   if (connectivityFailure) return connectivityFailure;
 
-  if (input.health.calibrationStatus === 'EXPIRED') {
-    return createFailDecision('CALIBRATION_EXPIRED', 'calibration', 0, 1);
-  }
+  if (input.health.calibrationStatus === 'EXPIRED') return createFailDecision('CALIBRATION_EXPIRED', 'calibration', 0, 1);
   if (!finite(input.health.batteryLevel) || input.health.batteryLevel < thresholds.device.minBattery) {
     return fail('LOW_BATTERY', 'batteryLevel', input.health.batteryLevel ?? 0, thresholds.device.minBattery);
   }
@@ -97,14 +91,13 @@ export function evaluateSafety(input: SafetyEngineInput): SafetyDecision {
   const filterFailure = checkFilters(input.health.filterHealth, thresholds.device.minFilterHealth);
   if (filterFailure) return filterFailure;
 
-  if (input.recordWritable === false) return createFailDecision('RECORD_WRITE_FAILURE', 'recordWritable', 0, 1);
+  if (input.recordWritable !== true) return createFailDecision('RECORD_WRITE_FAILURE', 'recordWritable', 0, 1);
 
   const inletFailure = checkReading(input.inlet, 'inlet', thresholds);
   if (inletFailure) return inletFailure;
 
-  if (input.uvFlowInterlockOk === false) {
-    return createFailDecision('FLOW_OUT_OF_RANGE', 'uvFlowInterlock', 0, 1);
-  }
+  // The UV/flow interlock is a critical permission, so only explicit true is safe.
+  if (input.uvFlowInterlockOk !== true) return createFailDecision('FLOW_OUT_OF_RANGE', 'uvFlowInterlock', 0, 1);
   if (!input.treatmentCompleted) return createPassDecision('PRE_TREATMENT');
 
   if (!input.outlet) return createFailDecision('SENSOR_DISCONNECTED', 'outlet', 0, 1);
@@ -124,7 +117,5 @@ export function lockedState(decision: SafetyDecision): SafetyState {
 
 export function explainDecision(decision: SafetyDecision): string {
   if (decision.passed) return 'Verified for the configured safety parameters.';
-  return decision.rejectionCode
-    ? REJECTION_DESCRIPTIONS[decision.rejectionCode]
-    : decision.rejectionReason ?? 'Safety gate failed.';
+  return decision.rejectionCode ? REJECTION_DESCRIPTIONS[decision.rejectionCode] : decision.rejectionReason ?? 'Safety gate failed.';
 }
